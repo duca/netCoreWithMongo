@@ -2,6 +2,7 @@
 using Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using MongoDB.Driver.GeoJsonObjectModel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,9 +26,10 @@ namespace dioMongo.Controllers
         }
 
         [HttpPost]
-        public ActionResult SalvarInfectado([FromBody] InfectadoDto dto)
+        public ActionResult SalvarInfectado([FromBody] InfectadoDto dto_)
         {
-            var infectado = new Infectado(dto.DataNascimento, dto.Sexo, dto.Latitude, dto.Longitude);
+            var newRef = MongoDB.Bson.ObjectId.GenerateNewId().ToString();
+            var infectado = new Infectado(newRef, dto_.DataNascimento, dto_.Sexo, dto_.Latitude, dto_.Longitude);
 
             _infectadosCollection.InsertOne(infectado);
 
@@ -40,6 +42,26 @@ namespace dioMongo.Controllers
             var infectados = _infectadosCollection.Find(Builders<Infectado>.Filter.Empty).ToList();
 
             return Ok(infectados);
+        }
+
+        [HttpPut]
+        public ActionResult AtualizarInfectado ([FromBody] InfectadoDto dto_)
+        {
+            var filtro = Builders<Infectado>.Filter.Where(alvo => alvo.DataNascimento == dto_.DataNascimento);
+            var newOne = Builders<Infectado>.Update.Set(_ => _.DataNascimento, dto_.DataNascimento)
+                .Set(_ => _.Sexo, dto_.Sexo)
+                .Set(_ => _.Localizacao, new GeoJson2DGeographicCoordinates(dto_.Latitude, dto_.Longitude));
+
+            _infectadosCollection.UpdateOne(filtro, newOne);
+            return Ok("Atualizado com sucesso");
+        }
+
+        [HttpDelete("{ref_}")]
+        public ActionResult RemoverInfectado (string ref_)
+        {
+            _infectadosCollection.DeleteOne(Builders<Infectado>.Filter.Where(_ => _.Ref == ref_));
+
+            return Ok("Elemento removido " + ref_);
         }
     }
 }
